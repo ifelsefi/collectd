@@ -1,0 +1,11 @@
+
+- name: check if collectd present
+  stat: path=/etc/collectd.conf
+  register: collectd_present
+
+- name: check if nvidia-smi present
+  stat: path=/usr/bin/nvidia-smi
+  register: nvidia_present
+
+- include: configure.yml
+  when: collectd_present.stat.exists == false

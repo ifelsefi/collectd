@@ -1,0 +1,74 @@
+
+- name: copy nvidia
+  copy: src=datacenter-gpu-manager-1.5.6-1.x86_64.rpm dest=/tmp/datacenter-gpu-manager-1.5.6-1.x86_64.rpm
+  when: nvidia_present.stat.exists == true
+
+- name: yum install nvidia
+  yum: name=/tmp/datacenter-gpu-manager-1.5.6-1.x86_64.rpm state=present
+  when: nvidia_present.stat.exists == true
+
+- name: yum install epel-release
+  yum: name=epel-release state=present
+
+- name: yum install collectd
+  yum: name=collectd state=present
+
+- name: yum install collectd-bind
+  yum: name=collectd-bind state=present
+  when: inventory_hostname in groups.dns
+
+- name: mkdir
+  shell: mkdir /usr/lib64/collectd/dcgm
+  ignore_errors: True
+  when: nvidia_present.stat.exists == true
+
+- name: cp 
+  shell: cp /usr/src/dcgm/bindings/*.py /usr/lib64/collectd/dcgm
+  ignore_errors: True
+  when: nvidia_present.stat.exists == true
+
+- name: another cp
+  shell: cp /usr/src/dcgm/samples/scripts/dcgm_collectd_plugin.py /usr/lib64/collectd/dcgm
+  ignore_errors: True
+  when: nvidia_present.stat.exists == true
+
+- name: sed 
+  shell: sed -i -e 's|\(g_dcgmLibPath =\) '"'"'/usr/lib'"'"'|\1 '"'"'/usr/lib64'"'"'|g' /usr/lib64/collectd/dcgm/dcgm_collectd_plugin.py
+  when: nvidia_present.stat.exists == true
+
+- name: copy collectd.conf
+  template: src=collectd.conf dest=/etc/collectd.conf
+
+- name: copy nvengine collectd file
+  template: src=nvengine.conf dest=/etc/collectd.d/nvengine.conf
+  when: nvidia_present.stat.exists == true
+
+- name: types.db
+  template: src=types.db dest=/usr/share/collectd/types.db
+  when: nvidia_present.stat.exists == true
+
+- name: nvengine.service
+  copy: src=nvengine.service dest=/etc/systemd/system/nvengine.service
+  when: nvidia_present.stat.exists == true
+
+- name: reload systemd
+  systemd: daemon_reload=yes
+
+- name: start nvengine
+  systemd: name=nvengine state=restarted enabled=yes
+  when: nvidia_present.stat.exists == true
+
+- name: start collectd
+  systemd: name=collectd state=restarted enabled=yes
+
+- name: slack notification
+  tags: slack
+  slack: token=TAV266ALW/BAV718YPR/qztkrd9fXQqLD9CLWmqrWsHx channel=#ansible msg='{{ ansible_env.SUDO_USER }} ran collectd role on {{ inventory_hostname }}' color=good
+         icon_url=http://media.linkonlineworld.com/img/Large/2014/11/9/2014_11_9_10_22_13_286.jpg
+  when: ansible_env.SUDO_USER is defined
+
+- name: slack notification
+  tags: slack
+  slack: token=TAV266ALW/BAV718YPR/qztkrd9fXQqLD9CLWmqrWsHx channel=#ansible msg='{{ ansible_env.USER }} ran collectd role on {{ inventory_hostname }}' color=good
+         icon_url=http://media.linkonlineworld.com/img/Large/2014/11/9/2014_11_9_10_22_13_286.jpg
+  when: ansible_env.USER == 'root' and ansible_env.SUDO_USER is not defined

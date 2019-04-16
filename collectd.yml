@@ -1,0 +1,5 @@
+---
+- hosts: "{{ hosts }}"
+  roles: 
+    - collectd
+  gather_facts: True
